@@ -387,7 +387,7 @@ def prepare_payload(env, config, module_name: str, addendum: str = ""):
     """
     system_prompt, user_prompt = prepare_prompt(env, module_name, addendum)
     payload = {
-        "model": "gpt-4-vision-preview",
+        "model": "gpt-4-turbo",
         "messages": [
             {
                 "role": "system",
