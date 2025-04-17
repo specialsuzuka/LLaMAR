@@ -9,7 +9,7 @@ import openai
 
 # save a json file with your openai api key in your
 # home folder as {"my_openai_api_key": "INSERT API HERE"}
-with open(os.path.expanduser("~") + "/openai_key.json") as json_file:
+with open("./openai_key.json") as json_file:
     key = json.load(json_file)
     openai_api_key = key["my_openai_api_key"]
 openai.api_key = openai_api_key

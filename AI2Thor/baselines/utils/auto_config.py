@@ -86,7 +86,8 @@ class AutoConfig:
         config_dir = Path(__file__).parent.parent.parent.parent.absolute()
         config_path = config_dir / config_file
 
-        with open(config_path, "r") as f:
+        # with open(config_path, "r") as f:
+        with open("configs/config_type1.json", "r") as f: 
             self.config_dict = json.load(f)
         self.config_arr = self.config_dict["tasks"]
 

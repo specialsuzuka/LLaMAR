@@ -16,7 +16,7 @@ from AI2Thor.env_new import AI2ThorEnv, AGENT_NAMES
 from AI2Thor.base_env import convert_dict_to_string
 from AI2Thor.object_actions import get_closest_feasible_action, get_closest_object_id
 
-with open(os.path.expanduser("~") + "/openai_key.json") as json_file:
+with open("./openai_key.json") as json_file:
     key = json.load(json_file)
     api_key = key["my_openai_api_key"]
 headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
@@ -431,8 +431,12 @@ def get_action(response):
 
 def get_gpt_response(env, config, action_or_planner: str, addendum: str = ""):
     payload = prepare_payload(env, config, action_or_planner, addendum)
+    # response = requests.post(
+    #     "https://api.openai.com/v1/chat/completions", headers=headers, json=payload
+    # )
+    
     response = requests.post(
-        "https://api.openai.com/v1/chat/completions", headers=headers, json=payload
+        "https://api.deepseek.com", headers=headers, json=payload
     )
     return response
 

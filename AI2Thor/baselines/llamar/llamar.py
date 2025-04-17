@@ -1,3 +1,4 @@
+# 导入必要的库和模块
 import re
 import base64
 import requests
@@ -7,92 +8,94 @@ import tqdm
 from pathlib import Path
 import sys
 
-# set parent directory to address relative imports
+# 设置当前目录为工作目录，便于处理相对路径
 directory = Path(os.getcwd()).absolute()
-sys.path.append(
-    str(directory)
-)  # note: no ".parent" addition is needed for python (.py) files
+sys.path.append(str(directory))  # 添加当前目录到 Python 路径中，便于导入模块
 print(os.getcwd())
 
-# import environment
+# 导入 AI2Thor 环境模块
 from AI2Thor.env_new import AI2ThorEnv
 
-# load info about amt of agent before utils
+# 解析命令行参数
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--task", type=int, default=0)
-parser.add_argument("--floorplan", type=int, default=0)
-parser.add_argument("--verbose", action="store_true")
-parser.add_argument("--action_verbose", action="store_true")
-parser.add_argument("--name", type=str, default="llamar")
-parser.add_argument("--agents", type=int, default=2)
-parser.add_argument("--config_file", type=str, default="config.json")
+parser.add_argument("--task", type=int, default=0)  # 任务 ID
+parser.add_argument("--floorplan", type=int, default=0)  # 楼层平面图 ID
+parser.add_argument("--verbose", action="store_true")  # 是否打印详细信息
+parser.add_argument("--action_verbose", action="store_true")  # 是否打印动作详细信息
+parser.add_argument("--name", type=str, default="llamar")  # 基线名称
+parser.add_argument("--agents", type=int, default=2)  # 代理数量
+parser.add_argument("--config_file", type=str, default="config.json")  # 配置文件路径
 args = parser.parse_args()
 
-# change config file
-# write config file
+# 创建并写入配置文件
 with open("AI2Thor/baselines/llamar/config.json", "w+") as f:
-    d = {"num_agents": args.agents}
+    d = {
+        "num_agents": args.agents,
+        "tasks": [
+            {
+                "task_id": args.task,
+                "floorplan": args.floorplan,
+                # 添加其他任务相关配置
+            }
+        ],
+    }
     json.dump(d, f)
-    # d = json.load(f)
-    # num_agents=d["num_agents"]
 
-
-# import utils for this baseline - with updated config file
+# 导入工具函数和配置类
 from AI2Thor.baselines.llamar.llamar_utils_multiagent import *
 from AI2Thor.baselines.utils import Logger, AutoConfig
 
 import warnings
 import os
 
-
-# to avoid warning
+# 禁用并行化警告
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-
-# no warnings
 warnings.filterwarnings("ignore")
 
-
-with open(os.path.expanduser("~") + "/openai_key.json") as json_file:
+# 加载 OpenAI API 密钥
+with open("./openai_key.json") as json_file:
     key = json.load(json_file)
     api_key = key["my_openai_api_key"]
 headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
 
-# autoconfig
+# 自动配置任务参数
 auto = AutoConfig(config_file=args.config_file)
 auto.set_task(args.task)
 auto.set_floorplan(args.floorplan)
 auto.set_agents(args.agents)
-timeout = auto.get_task_timeout()
+timeout = auto.get_task_timeout()  # 获取任务超时时间
 
-# environment initialization
+# 初始化环境
 config = auto.config()
-
 env = AI2ThorEnv(config)
-# remove verbosity
-env.verbose = False
-d = env.reset(task=auto.task_string())
-# logger
-logger = Logger(env=env, baseline_name=args.name)
+env.verbose = False  # 禁用环境的详细输出
+# d = env.reset(task=auto.task_string())  # 重置环境
+d = env.step(
+    [
+        "Move(Ahead)",
+    ]
+)
+logger = Logger(env=env, baseline_name=args.name)  # 初始化日志记录器
 print("baseline path (w/ results):", logger.baseline_path)
 
-# some inits
-previous_action = [] * config.num_agents
-previous_success = [True, True]  # initialize with True
+# 初始化变量
+previous_action = [] * config.num_agents  # 记录上一步的动作
+previous_success = [True, True]  # 初始化为成功状态
 
-# there is weird try-except loop wrapper (done in order to prevent json errors)
+# 打印基线启动信息
 print("*" * 50)
 print("Starting the llamar baseline")
 print("*" * 50)
 
-# PLANNER - Initial only!
+# PLANNER - 初始规划器
 success = False
 while not success:
     try:
-        # TODO: remove prints
+        # 调用 GPT 模型生成初始计划
         response = get_gpt_response(env, config, action_or_planner="planner")
-        outdict = get_action(response)
+        outdict = get_action(response)  # 解析 GPT 响应
         if args.verbose:
             print("Planner Output:\n", outdict)
         success = True
@@ -100,18 +103,19 @@ while not success:
         print("failure reason (in try-except loop):", e)
         pass
 
-# Start of LoOpP - while not finished or has passed timeout
-
+# 主循环：执行任务直到完成或超时
 for step_num in tqdm.trange(timeout):
 
+    # 更新计划，基于当前环境状态和已完成的子任务
     update_plan(env, outdict["plan"], env.closed_subtasks)
 
-    # ACTOR
+    # ACTOR - 执行动作
     success = False
     while not success:
         try:
+            # 调用 GPT 模型生成动作
             response = get_gpt_response(env, config, action_or_planner="action")
-            outdict = get_action(response)
+            outdict = get_action(response)  # 解析动作响应
             success = True
             if args.verbose or args.action_verbose:
                 print("*" * 10, "Actor outdict!", "*" * 10)
@@ -120,27 +124,35 @@ for step_num in tqdm.trange(timeout):
         except:
             pass
 
+    # 处理动作输出，提取动作、原因、子任务、记忆等信息
     preaction, reason, subtask, memory, failure_reason = process_action_llm_output(
         outdict
     )
     action = print_stuff(env, preaction, reason, subtask, memory, failure_reason)
 
+    # 记录代理的记忆信息
     logger.log_agent_mem(env.step_num, action, reason, subtask, memory)
-    # manual temporary logging
+
+    # 更新共享子任务和记忆（如果启用）
     if config.use_shared_subtask:
         env.update_subtask(subtask, 0)
     if config.use_shared_memory:
         env.update_memory(memory, 0)
+
+    # 执行动作并获取结果
     d1, successes = env.step(action)
     previous_action = action
     previous_success = successes
+
+    # 打印相关信息（如果启用详细模式）
     if args.verbose:
         print_relevant_info(env, config, env.input_dict)
 
-    # VERIFIER
+    # VERIFIER - 验证动作结果
     success = False
     while not success:
         try:
+            # 调用 GPT 模型验证动作
             response = get_gpt_response(env, config, action_or_planner="verifier")
             outdict = get_action(response)
             if args.verbose:
@@ -149,15 +161,14 @@ for step_num in tqdm.trange(timeout):
         except:
             pass
 
-    # v0 - update completed subtasks list - no for now
-    # env.closed_subtasks = set_addition(env.closed_subtasks, outdict["completed subtasks"])
+    # 更新已完成的子任务列表
     env.closed_subtasks = outdict["completed subtasks"]
     if len(env.closed_subtasks) == 0:
         env.closed_subtasks = None
     env.input_dict["Robots' completed subtasks"] = env.closed_subtasks
     env.get_planner_llm_input()
 
-    # PLANNER
+    # PLANNER - 更新计划
     success = False
     while not success:
         try:
@@ -167,12 +178,12 @@ for step_num in tqdm.trange(timeout):
         except:
             pass
 
-    # get statistics and finish step
+    # 获取统计信息并完成当前步骤
     coverage = env.checker.get_coverage()
     transport_rate = env.checker.get_transport_rate()
     finished = env.checker.check_success()
 
-    # log current 'step'
+    # 记录当前步骤的日志
     logger.log_step(
         step=step_num,
         preaction=preaction,
@@ -183,15 +194,16 @@ for step_num in tqdm.trange(timeout):
         finished=finished,
     )
 
+    # 打印步骤信息（如果启用详细模式）
     if args.verbose:
         print("_" * 50)
         print(f"Step {step_num}")
         print(f"Completed Subtasks: ")
         print("\n".join(env.checker.subtasks_completed))
 
-    # if the model outputs "Done" for both agents, break
+    # 如果所有代理都输出 "Done"，则结束循环
     if all(status == "Done" for status in action):
         break
 
-# STOP - stop the controller / remove window
+# 停止环境控制器
 env.controller.stop()
