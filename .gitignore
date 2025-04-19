@@ -149,3 +149,9 @@ dmypy.json
 # sandbox
 sandbox.ipynb
 openai_key.json
+
+#pics
+*.png
+*.jpg
+*.jpeg
+*.mp4
