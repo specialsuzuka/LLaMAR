@@ -33,6 +33,7 @@ class AI2ThorEnv(BaseEnv):
             height=1000,
             scene=args.scene,
             gridSize=0.25,
+            platform=CloudRendering
         )
         self.agent_names = AGENT_NAMES
         self.move_actions = ["MoveAhead", "MoveBack", "MoveRight", "MoveLeft"]

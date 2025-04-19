@@ -148,3 +148,4 @@ dmypy.json
 
 # sandbox
 sandbox.ipynb
+openai_key.json

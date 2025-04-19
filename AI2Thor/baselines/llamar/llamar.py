@@ -7,6 +7,14 @@ import pandas as pd
 import tqdm
 from pathlib import Path
 import sys
+import openai  # 确保安装了 openai 库：pip install openai
+
+
+
+#===========================================================
+CALLCOUNT = 0
+#===========================================================
+
 
 # 设置当前目录为工作目录，便于处理相对路径
 directory = Path(os.getcwd()).absolute()
@@ -15,7 +23,6 @@ print(os.getcwd())
 
 # 导入 AI2Thor 环境模块
 from AI2Thor.env_new import AI2ThorEnv
-
 # 解析命令行参数
 import argparse
 
@@ -70,13 +77,13 @@ timeout = auto.get_task_timeout()  # 获取任务超时时间
 # 初始化环境
 config = auto.config()
 env = AI2ThorEnv(config)
-env.verbose = False  # 禁用环境的详细输出
-# d = env.reset(task=auto.task_string())  # 重置环境
-d = env.step(
-    [
-        "Move(Ahead)",
-    ]
-)
+env.verbose = True  # 禁用环境的详细输出
+d = env.reset(task=auto.task_string())  # 重置环境
+# d = env.step(
+#     [
+#         "Move(Ahead)",
+#     ]
+# )
 logger = Logger(env=env, baseline_name=args.name)  # 初始化日志记录器
 print("baseline path (w/ results):", logger.baseline_path)
 
@@ -94,7 +101,8 @@ success = False
 while not success:
     try:
         # 调用 GPT 模型生成初始计划
-        response = get_gpt_response(env, config, action_or_planner="planner")
+        CALLCOUNT+=1
+        response = get_gpt_response(env, config, action_or_planner="planner",CALLCOUNT = CALLCOUNT)
         outdict = get_action(response)  # 解析 GPT 响应
         if args.verbose:
             print("Planner Output:\n", outdict)
@@ -108,13 +116,14 @@ for step_num in tqdm.trange(timeout):
 
     # 更新计划，基于当前环境状态和已完成的子任务
     update_plan(env, outdict["plan"], env.closed_subtasks)
-
     # ACTOR - 执行动作
     success = False
     while not success:
         try:
             # 调用 GPT 模型生成动作
-            response = get_gpt_response(env, config, action_or_planner="action")
+            CALLCOUNT+=1
+            response = get_gpt_response(env, config, action_or_planner="action",CALLCOUNT = CALLCOUNT)
+            # print("调用一次动作VLM")
             outdict = get_action(response)  # 解析动作响应
             success = True
             if args.verbose or args.action_verbose:
@@ -141,6 +150,10 @@ for step_num in tqdm.trange(timeout):
 
     # 执行动作并获取结果
     d1, successes = env.step(action)
+    # fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 编码格式
+    # video_writer = cv2.VideoWriter('output.mp4', fourcc, 30.0, (1280, 720))
+    # frame = d1.cv2img  # 获取BGR格式图像[3](@ref)
+    # video_writer.write(frame)
     previous_action = action
     previous_success = successes
 
@@ -153,7 +166,8 @@ for step_num in tqdm.trange(timeout):
     while not success:
         try:
             # 调用 GPT 模型验证动作
-            response = get_gpt_response(env, config, action_or_planner="verifier")
+            CALLCOUNT+=1
+            response = get_gpt_response(env, config, action_or_planner="verifier",CALLCOUNT = CALLCOUNT)
             outdict = get_action(response)
             if args.verbose:
                 print("Verifier Output:\n", outdict)
@@ -172,7 +186,8 @@ for step_num in tqdm.trange(timeout):
     success = False
     while not success:
         try:
-            response = get_gpt_response(env, config, action_or_planner="planner")
+            CALLCOUNT+=1
+            response = get_gpt_response(env, config, action_or_planner="planner",CALLCOUNT = CALLCOUNT)
             outdict = get_action(response)
             success = True
         except:

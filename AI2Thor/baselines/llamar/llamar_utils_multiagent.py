@@ -5,6 +5,11 @@ import json, os
 import pandas as pd
 from pathlib import Path
 import sys
+from openai import OpenAI  # 确保安装了 openai 库：pip install openai
+import openai
+
+
+
 
 # set parent directory to address relative imports
 directory = Path(os.getcwd()).absolute()
@@ -15,6 +20,8 @@ sys.path.append(
 from AI2Thor.env_new import AI2ThorEnv, AGENT_NAMES
 from AI2Thor.base_env import convert_dict_to_string
 from AI2Thor.object_actions import get_closest_feasible_action, get_closest_object_id
+import cv2
+import numpy as np
 
 with open("./openai_key.json") as json_file:
     key = json.load(json_file)
@@ -362,6 +369,7 @@ def prepare_prompt(env, module_name: str, addendum: str):
     elif module_name == "planner":
         system_prompt = PLANNER_PROMPT
         user_prompt = convert_dict_to_string(env.get_planner_llm_input())
+        print("计划提示", user_prompt)
     elif module_name == "verifier":
         system_prompt = VERIFIER_PROMPT
         user_prompt = convert_dict_to_string(env.get_verifier_llm_input())
@@ -377,15 +385,55 @@ def prepare_payload(env, config, module_name: str, addendum: str = ""):
     This is then sent to the openai api to get the response (action or plan or verification of the plan)
     """
     system_prompt, user_prompt = prepare_prompt(env, module_name, addendum)
+
     base64_image = [encode_image(env.get_frame(i)) for i in range(len(AGENT_NAMES))]
+    import matplotlib.pyplot as plt
+
+    # Save the images obtained from get_frame
+    for i, image_base64 in enumerate(base64_image):
+        # Decode the base64 image
+        image_data = base64.b64decode(image_base64)
+        np_arr = np.frombuffer(image_data, np.uint8)
+        # image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+        # Save the image to a file with an incrementing number
+        # counter = 1
+        # while True:
+        #     output_path = (
+        #         f"./vlm_input/2/agent_{AGENT_NAMES[i]}_perspective_{counter}.png"
+        #     )
+        #     if not os.path.exists(output_path):
+        #         break
+        #     counter += 1
+
+        # cv2.imwrite(output_path, image)
+        # print(f"Saved Agent {AGENT_NAMES[i]}'s Perspective to {output_path}")
     image_urls = [
-        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image}"}}
-        for image in base64_image
+        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image64}"}}
+        for image64 in base64_image
     ]
     # image_urls = [{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,123"}} for image in base64_image]
 
+    # payload = {
+    #     "model": "gpt-4-vision-preview",
+    #     "messages": [
+    #         {
+    #             "role": "system",
+    #             "content": [
+    #                 {"type": "text", "text": system_prompt},
+    #             ],
+    #         },
+    #         {
+    #             "role": "user",
+    #             "content": [{"type": "text", "text": user_prompt}] + image_urls,
+    #         },
+    #     ],
+    #     "max_tokens": 1000,
+    #     "temperature": config.temperature,
+    # }
+
     payload = {
-        "model": "gpt-4-vision-preview",
+        "model": "doubao-1.5-vision-pro-250328",
         "messages": [
             {
                 "role": "system",
@@ -401,44 +449,78 @@ def prepare_payload(env, config, module_name: str, addendum: str = ""):
         "max_tokens": 1000,
         "temperature": config.temperature,
     }
-    return payload
+
+    return payload, image_urls, system_prompt, user_prompt
 
 
 def get_action(response):
     response_dict = response.json()
     # convert the string to a dict
     # json_acceptable_string = response_dict["choices"][0]["message"]["content"].replace("'", "\"").replace("\n", "").replace("json", "").replace("`", "")
-    output = response_dict["choices"][0]["message"]["content"]
+
+    output = response.choices[0].message.content
+    # output = json.loads(content)
+    # output = response.choices[0].message.content
     json_match = re.search(r"```json(.*?)```", output, re.DOTALL)
     python_match = re.search(r"```python(.*?)```", output, re.DOTALL)
     tilde_match = re.search(r"```(.*?)```", output, re.DOTALL)
     if json_match:
-        # print("Got JSON TYPE OUTPUT")
+        print("Got JSON TYPE OUTPUT")
         json_data = json_match.group(1)
     elif python_match:
-        # print("Got JSON TYPE OUTPUT")
+        print("Got JSON TYPE OUTPUT")
         json_data = python_match.group(1)
     elif tilde_match:
-        # print("Got JSON TYPE OUTPUT")
+        print("Got JSON TYPE OUTPUT")
         json_data = tilde_match.group(1)
     else:
-        # print("Got NORMAL TYPE OUTPUT")
+        print("Got NORMAL TYPE OUTPUT")
         json_data = output
     # print(json_data)
     out_dict = json.loads(json_data)
     return out_dict
 
 
-def get_gpt_response(env, config, action_or_planner: str, addendum: str = ""):
-    payload = prepare_payload(env, config, action_or_planner, addendum)
-    # response = requests.post(
-    #     "https://api.openai.com/v1/chat/completions", headers=headers, json=payload
-    # )
-    
-    response = requests.post(
-        "https://api.deepseek.com", headers=headers, json=payload
+def get_gpt_response(env, config, action_or_planner: str, addendum: str = "",CALLCOUNT:int = 0):
+    # 准备系统和用户提示
+    payload, image_urls, system_prompt, user_prompt = prepare_payload(
+        env, config, action_or_planner, addendum
     )
-    return response
+    # system_prompt = payload["messages"][0]["content"]
+    # user_prompt = payload["messages"][1]["content"]
+    # 调用 OpenAI API
+    try:
+        client = OpenAI(
+            # 此为默认路径，您可根据业务所在地域进行配置
+            base_url="https://ark.cn-beijing.volces.com/api/v3",
+            # 从环境变量中获取您的 API Key。此为默认方式，您可根据需要进行修改
+            api_key="473520b9-1698-4199-b7b7-eba707b2c6c6",
+        )
+        response = client.chat.completions.create(
+            model="doubao-1.5-vision-pro-250328",  # 使用 OpenAI 的 GPT-4 模型
+            messages=[
+                {
+                    "role": "system",
+                    "content": [
+                        {"type": "text", "text": system_prompt},
+                    ],
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": user_prompt},
+                    ]
+                    + image_urls,
+                },
+            ],
+            max_tokens=1000,
+            temperature=config.temperature,
+        )
+        print("API call count: ", CALLCOUNT)
+        return response
+    except openai.OpenAIError as e:
+        print(f"Error calling OpenAI API: {e}")
+        raise
 
 
 def print_relevant_info(env, config, input_dict):
@@ -543,6 +625,8 @@ def update_plan(env, open_subtasks, completed_subtasks):
     env.closed_subtasks = completed_subtasks
     env.input_dict["Robots' open subtasks"] = env.open_subtasks
     env.input_dict["Robots' completed subtasks"] = env.closed_subtasks
+    print("Updated open subtasks: ", env.open_subtasks)
+    print("Updated completed subtasks: ", env.closed_subtasks)
 
 
 # OLD - deprecated

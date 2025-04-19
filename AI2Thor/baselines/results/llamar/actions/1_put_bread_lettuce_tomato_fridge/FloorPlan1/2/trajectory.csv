@@ -1,0 +1,16 @@
+Step,Pre-Action,Action,Success,Coverage,Transport Rate,Finished
+0,"['pick up object Bread_1', 'navigate to object Fridge_1']","['PickupObject(Bread_1)', 'NavigateTo(Fridge_1)']","[False, True]",0.5,0.0,False
+1,"['move in Ahead direction', 'stay idle']","['Move(Ahead)', 'Idle']","[True, True]",0.5,0.0,False
+2,"['pick up object Bread_1', 'open object Fridge_1']","['PickupObject(Bread_1)', 'OpenObject(Fridge_1)']","[False, True]",0.5,0.07142857142857142,False
+3,"['navigate to Bread_1', 'stay idle']","['NavigateTo(Bread_1)', 'Idle']","[True, True]",0.5,0.14285714285714285,False
+4,"['pick up object Bread_1', 'stay idle']","['PickupObject(Bread_1)', 'Idle']","[True, True]",0.5,0.21428571428571427,False
+5,"['navigate to object Fridge_1', 'stay idle']","['NavigateTo(Fridge_1)', 'Idle']","[True, True]",0.5,0.2857142857142857,False
+6,"['put object on Fridge_1', 'navigate to object Lettuce_1']","['PutObject(Fridge_1)', 'NavigateTo(Lettuce_1)']","[True, False]",0.75,0.35714285714285715,False
+7,"['stay idle', 'rotate in Right direction']","['Idle', 'Rotate(Right)']","[True, True]",0.75,0.35714285714285715,False
+8,"['navigate to object Tomato_1', 'navigate to object Lettuce_1']","['NavigateTo(Tomato_1)', 'NavigateTo(Lettuce_1)']","[True, True]",1.0,0.5,False
+9,"['pick up object Tomato_1', 'pick up object Lettuce_1']","['PickupObject(Tomato_1)', 'PickupObject(Lettuce_1)']","[True, True]",1.0,0.6428571428571429,False
+10,"['put object on Fridge_1', 'put object on Fridge_1']","['PutObject(Fridge_1)', 'PutObject(Fridge_1)']","[True, True]",1.0,0.9285714285714286,False
+11,"['close object Fridge_1', 'stay idle']","['CloseObject(Fridge_1)', 'Idle']","[False, True]",1.0,0.9285714285714286,False
+12,"['stay idle', 'move in Back direction']","['Idle', 'Move(Back)']","[True, True]",1.0,0.9285714285714286,False
+13,"['navigate to object Bread_1', 'stay idle']","['NavigateTo(Bread_1)', 'Idle']","[True, True]",1.0,0.9285714285714286,False
+14,"['pick up object Bread_1', 'stay idle']","['PickupObject(Bread_1)', 'Idle']","[True, True]",1.0,0.9285714285714286,False

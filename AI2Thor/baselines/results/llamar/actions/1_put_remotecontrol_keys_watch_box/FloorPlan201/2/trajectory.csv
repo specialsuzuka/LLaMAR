@@ -1,0 +1,2 @@
+Step,Pre-Action,Action,Success,Coverage,Transport Rate,Finished
+0,"['rotate in Right direction', 'rotate in Left direction']","['Rotate(Right)', 'Rotate(Left)']","[True, True]",0.0,0.0,False
